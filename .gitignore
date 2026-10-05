@@ -1,0 +1,22 @@
+# Python bytecode and compiler caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Local data cache (crucial: do not commit the 3,000 scraped JSON cache files!)
+.cache/
+
+# Testing caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
