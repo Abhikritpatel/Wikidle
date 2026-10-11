@@ -64,7 +64,7 @@ def test_build_graph_filtering_and_self_loops(tmp_path):
     
     # 3. Build the graph
     builder = GraphBuilder(cache_dir=str(cache_dir))
-    graph = builder.build_graph(str(crawled_file), str(output_file))
+    graph = builder.build_graph(str(crawled_file), str(output_file), strongly_connected=False)
     
     # 4. Assertions
     # A's links should only contain B (A and D filtered out)
@@ -82,3 +82,20 @@ def test_build_graph_filtering_and_self_loops(tmp_path):
         saved_graph = json.load(f)
         
     assert saved_graph == graph
+
+
+def test_largest_scc_drops_dead_ends_and_unreachable_pages():
+    from data_pipeline.graph_builder import largest_strongly_connected_component, restrict_to_nodes
+
+    graph = {
+        "A": ["B", "Dead"],
+        "B": ["C"],
+        "C": ["A"],
+        "Dead": [],            # dead end
+        "Source": ["A"],       # nothing links back to it
+    }
+    keep = largest_strongly_connected_component(graph)
+    assert keep == {"A", "B", "C"}
+    pruned = restrict_to_nodes(graph, keep)
+    assert pruned == {"A": ["B"], "B": ["C"], "C": ["A"]}
+    assert all(pruned.values())

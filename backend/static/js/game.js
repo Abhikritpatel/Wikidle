@@ -125,7 +125,11 @@ async function initGame() {
         let saved = null;
         try { saved = JSON.parse(read("wikidle_state") || "null"); } catch (e) { saved = null; }
 
-        if (saved && saved.date === gameState.date) {
+        const sameGame = saved && saved.date === gameState.date &&
+            Array.isArray(saved.clickHistory) && saved.clickHistory.length &&
+            saved.clickHistory[0].page === gameState.startNode;
+
+        if (sameGame) {
             Object.assign(gameState, {
                 currentPage: saved.currentPage,
                 clicksUsed: saved.clicksUsed,
