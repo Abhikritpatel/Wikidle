@@ -38,6 +38,62 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def largest_strongly_connected_component(graph: Dict[str, List[str]]) -> Set[str]:
+    """
+    Returns the node set of the largest strongly connected component (Kosaraju, iterative).
+
+    In a strongly connected set every page can reach every other page, so a player can
+    never land on a dead end or on a page with no route to the goal.
+    Time: O(V + E). Space: O(V + E).
+    """
+    order: List[str] = []
+    seen: Set[str] = set()
+    for root in graph:
+        if root in seen:
+            continue
+        seen.add(root)
+        stack = [(root, iter(graph[root]))]
+        while stack:
+            node, it = stack[-1]
+            for nxt in it:
+                if nxt in graph and nxt not in seen:
+                    seen.add(nxt)
+                    stack.append((nxt, iter(graph[nxt])))
+                    break
+            else:
+                stack.pop()
+                order.append(node)
+
+    transpose: Dict[str, List[str]] = {n: [] for n in graph}
+    for u, nbrs in graph.items():
+        for v in nbrs:
+            if v in transpose:
+                transpose[v].append(u)
+
+    assigned: Set[str] = set()
+    best: Set[str] = set()
+    for root in reversed(order):
+        if root in assigned:
+            continue
+        comp = {root}
+        assigned.add(root)
+        stack = [root]
+        while stack:
+            for prev in transpose[stack.pop()]:
+                if prev not in assigned:
+                    assigned.add(prev)
+                    comp.add(prev)
+                    stack.append(prev)
+        if len(comp) > len(best):
+            best = comp
+    return best
+
+
+def restrict_to_nodes(graph: Dict[str, List[str]], keep: Set[str]) -> Dict[str, List[str]]:
+    """Subgraph induced by `keep`: drops other nodes and any edge touching them."""
+    return {n: [m for m in graph[n] if m in keep] for n in graph if n in keep}
+
+
 class GraphBuilder:
     """
     Constructs a closed-universe directed graph from cached Wikipedia page data.
@@ -59,7 +115,8 @@ class GraphBuilder:
         hashed_title = hashlib.md5(title.encode("utf-8")).hexdigest()
         return os.path.join(self.cache_dir, f"{hashed_title}.json")
 
-    def build_graph(self, crawled_pages_file: str, output_graph_file: str) -> Dict[str, List[str]]:
+    def build_graph(self, crawled_pages_file: str, output_graph_file: str,
+                    strongly_connected: bool = True) -> Dict[str, List[str]]:
         """
         Reads the crawled pages index, loads their outgoing links from the cache,
         filters them to form a closed universe (no outgoing links outside the set,
@@ -67,6 +124,7 @@ class GraphBuilder:
         
         :param crawled_pages_file: Path to the JSON file containing the list of crawled pages.
         :param output_graph_file: Path to save the final adjacency list graph.
+        :param strongly_connected: Keep only the largest strongly connected component (no dead ends).
         :return: The constructed adjacency list dictionary.
         """
         # 1. Load the closed-universe nodes (V)
@@ -115,6 +173,13 @@ class GraphBuilder:
         logger.info("Total edges in raw scrape: %d", total_edges_before)
         logger.info("Total edges in closed universe: %d (Filtered out %d external/self links)", 
                     total_edges_after, total_edges_before - total_edges_after)
+
+        # 3b. Keep only the largest strongly connected component so the game has no
+        # dead ends and every page can still reach the goal after a wrong click.
+        if strongly_connected:
+            before = len(graph)
+            graph = restrict_to_nodes(graph, largest_strongly_connected_component(graph))
+            logger.info("Kept the largest strongly connected component: %d of %d pages", len(graph), before)
 
         # 4. Save the constructed graph to disk
         # Ensure target directory exists

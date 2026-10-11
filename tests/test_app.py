@@ -40,3 +40,14 @@ def test_move_validation_and_distance(client):
 
 def test_unknown_links_page(client):
     assert client.get("/api/links?page=nope").status_code == 404
+
+
+def test_graph_has_no_dead_ends():
+    graph = app_module.GENERATOR.graph
+    assert all(graph.values()), "every page must have at least one outgoing link"
+    assert all(link in graph for links in graph.values() for link in links)
+
+
+def test_goal_reachable_from_every_page():
+    p = app_module.get_puzzle_for_date(today())
+    assert len(p["distances"]) == len(app_module.GENERATOR.graph)
